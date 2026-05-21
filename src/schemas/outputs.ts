@@ -102,7 +102,6 @@ export const EnvVarListOutputSchema = {
 export const SecretOutputSchema = {
   _id: ObjectId,
   key: z.string(),
-  value: z.string(),
 };
 
 export const SecretListOutputSchema = {
