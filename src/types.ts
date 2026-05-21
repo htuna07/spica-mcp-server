@@ -28,6 +28,8 @@ export interface Identity {
   _id: string;
   identifier: string;
   policies?: string[];
+  failedAttempts?: unknown[];
+  lastLogin?: string;
 }
 
 // ─── Bucket ───────────────────────────────────────────────────────────────────
@@ -76,6 +78,7 @@ export interface SpicaFunction {
   language: string;
   env_vars?: Array<string | { _id: string; key: string; value: string }>;
   secrets?: Array<string | { _id: string; key: string; value: string }>;
+  memoryLimit?: number;
 }
 
 // ─── Storage ──────────────────────────────────────────────────────────────────

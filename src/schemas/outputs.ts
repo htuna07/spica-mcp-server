@@ -139,6 +139,7 @@ export const FunctionOutputSchema = {
       ]),
     )
     .optional(),
+  memoryLimit: z.number().optional(),
 };
 
 export const FunctionListOutputSchema = {
@@ -206,6 +207,8 @@ export const IdentityOutputSchema = {
   _id: ObjectId,
   identifier: z.string(),
   policies: z.array(z.string()).optional(),
+  failedAttempts: z.array(z.any()).optional(),
+  lastLogin: z.string().optional(),
 };
 
 export const IdentityListOutputSchema = {
