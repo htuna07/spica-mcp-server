@@ -2,7 +2,6 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
 import { SpicaClient } from "./client";
 import { registerAuthTools } from "./tools/auth";
 import { registerDatabaseTools } from "./tools/database";
@@ -10,7 +9,6 @@ import { registerDevelopmentTools } from "./tools/development";
 import { registerDebugTools } from "./tools/debug";
 import { registerAuditingTools } from "./tools/auditing";
 import { registerStorageTools } from "./tools/storage";
-import { registerVersionControlTools } from "./tools/versioncontrol";
 import {
   buildTriggerSchemas,
   type FunctionInformation,
@@ -45,7 +43,6 @@ registerDevelopmentTools(server, client, triggerInfo);
 registerDebugTools(server, client);
 registerAuditingTools(server, client);
 registerStorageTools(server, client);
-registerVersionControlTools(server, client);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
