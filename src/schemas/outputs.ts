@@ -85,6 +85,30 @@ export const ImportBucketDataOutputSchema = {
   results: z.array(ImportResultSchema).describe("Per-document insert result"),
 };
 
+// ─── Env Var ──────────────────────────────────────────────────────────────────
+
+export const EnvVarOutputSchema = {
+  _id: ObjectId,
+  key: z.string(),
+  value: z.string(),
+};
+
+export const EnvVarListOutputSchema = {
+  env_vars: z.array(z.object(EnvVarOutputSchema)),
+};
+
+// ─── Secret ───────────────────────────────────────────────────────────────────
+
+export const SecretOutputSchema = {
+  _id: ObjectId,
+  key: z.string(),
+  value: z.string(),
+};
+
+export const SecretListOutputSchema = {
+  secrets: z.array(z.object(SecretOutputSchema)),
+};
+
 // ─── Function ─────────────────────────────────────────────────────────────────
 
 const TriggerOutputSchema = z.object({

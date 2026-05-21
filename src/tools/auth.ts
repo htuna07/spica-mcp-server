@@ -175,18 +175,6 @@ const PolicyStatementSchema = z.discriminatedUnion("action", [
   twoRes("passport:user:policy:remove",      "passport:user:policy"),
 ]);
 
-const PolicyObjectSchema = z.object({
-  _id: z.string().optional().describe("Policy ID. Omit to create new."),
-  name: z.string().describe("Policy name"),
-  description: z.string().optional(),
-  statement: z.array(PolicyStatementSchema),
-});
-
-const PolicyInputSchema = z.union([
-  z.string().describe("Existing policy ID to attach"),
-  PolicyObjectSchema,
-]);
-
 export function registerAuthTools(
   server: McpServer,
   client: SpicaClient,
@@ -221,10 +209,9 @@ export function registerAuthTools(
       title: "Save API Key",
       description:
         "Creates or updates an API key (upsert). When _id is provided the key is updated, otherwise created. " +
-        "Accepts a policies array where each item is either:\n" +
-        "- a string (existing policyId to attach)\n" +
-        "- a full policy object { _id?, name, description?, statement[] } to create/update and attach.\n" +
-        "Policies not present in the array will be detached from the key.",
+        "Accepts a policies array of existing policy IDs to attach. " +
+        "Policies not present in the array will be detached from the key. " +
+        "Use save_policy to create or update a policy before attaching it.",
       inputSchema: z.object({
         _id: z
           .string()
@@ -234,9 +221,11 @@ export function registerAuthTools(
         description: z.string().optional().describe("Description"),
         active: z.boolean().describe("Whether the key is active"),
         policies: z
-          .array(PolicyInputSchema)
+          .array(z.string())
           .optional()
-          .describe("Policies to attach. Omitted policies will be detached."),
+          .describe(
+            "Policy IDs to attach. Policies not in this array are detached.",
+          ),
       }),
     },
     async ({ _id, name, description, active, policies }) => {
@@ -259,42 +248,14 @@ export function registerAuthTools(
 
       if (policies !== undefined) {
         const currentPolicies = apikey.policies ?? [];
-        const desiredPolicyIds: string[] = [];
 
-        for (const p of policies) {
-          if (typeof p === "string") {
-            desiredPolicyIds.push(p);
-          } else {
-            const policyBody: PolicyBase = {
-              name: p.name,
-              statement: p.statement,
-            };
-            if (p.description !== undefined)
-              policyBody.description = p.description;
-
-            let saved: PolicyBase & { _id: string };
-            if (p._id) {
-              saved = (await client.put(
-                `/passport/policy/${p._id}`,
-                policyBody,
-              )) as PolicyBase & { _id: string };
-            } else {
-              saved = (await client.post(
-                "/passport/policy",
-                policyBody,
-              )) as PolicyBase & { _id: string };
-            }
-            desiredPolicyIds.push(saved._id);
-          }
-        }
-
-        for (const pid of desiredPolicyIds) {
+        for (const pid of policies) {
           if (!currentPolicies.includes(pid)) {
             await client.put(`/passport/apikey/${apikeyId}/policy/${pid}`);
           }
         }
         for (const pid of currentPolicies) {
-          if (!desiredPolicyIds.includes(pid)) {
+          if (!policies.includes(pid)) {
             await client.delete(`/passport/apikey/${apikeyId}/policy/${pid}`);
           }
         }
@@ -352,10 +313,9 @@ export function registerAuthTools(
       title: "Save Identity",
       description:
         "Creates or updates an identity (upsert). When _id is provided the identity is updated, otherwise created. " +
-        "Accepts a policies array where each item is either:\n" +
-        "- a string (existing policyId to attach)\n" +
-        "- a full policy object { _id?, name, description?, statement[] } to create/update and attach.\n" +
-        "Policies not present in the array will be detached from the identity.",
+        "Accepts a policies array of existing policy IDs to attach. " +
+        "Policies not present in the array will be detached from the identity. " +
+        "Use save_policy to create or update a policy before attaching it.",
       inputSchema: z.object({
         _id: z.string().optional().describe("Identity ID. Omit to create."),
         identifier: z.string().describe("Unique identifier for the identity"),
@@ -364,9 +324,11 @@ export function registerAuthTools(
           .optional()
           .describe("Password. Required on create, optional on update."),
         policies: z
-          .array(PolicyInputSchema)
+          .array(z.string())
           .optional()
-          .describe("Policies to attach. Omitted policies will be detached."),
+          .describe(
+            "Policy IDs to attach. Policies not in this array are detached.",
+          ),
       }),
     },
     async ({ _id, identifier, password, policies }) => {
@@ -392,42 +354,14 @@ export function registerAuthTools(
 
       if (policies !== undefined) {
         const currentPolicies = identity.policies ?? [];
-        const desiredPolicyIds: string[] = [];
 
-        for (const p of policies) {
-          if (typeof p === "string") {
-            desiredPolicyIds.push(p);
-          } else {
-            const policyBody: PolicyBase = {
-              name: p.name,
-              statement: p.statement,
-            };
-            if (p.description !== undefined)
-              policyBody.description = p.description;
-
-            let saved: PolicyBase & { _id: string };
-            if (p._id) {
-              saved = (await client.put(
-                `/passport/policy/${p._id}`,
-                policyBody,
-              )) as PolicyBase & { _id: string };
-            } else {
-              saved = (await client.post(
-                "/passport/policy",
-                policyBody,
-              )) as PolicyBase & { _id: string };
-            }
-            desiredPolicyIds.push(saved._id);
-          }
-        }
-
-        for (const pid of desiredPolicyIds) {
+        for (const pid of policies) {
           if (!currentPolicies.includes(pid)) {
             await client.put(`/passport/identity/${identityId}/policy/${pid}`);
           }
         }
         for (const pid of currentPolicies) {
-          if (!desiredPolicyIds.includes(pid)) {
+          if (!policies.includes(pid)) {
             await client.delete(
               `/passport/identity/${identityId}/policy/${pid}`,
             );

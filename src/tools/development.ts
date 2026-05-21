@@ -12,6 +12,10 @@ import {
   FunctionListOutputSchema,
   FunctionIndexOutputSchema,
   FunctionDependenciesOutputSchema,
+  EnvVarOutputSchema,
+  EnvVarListOutputSchema,
+  SecretOutputSchema,
+  SecretListOutputSchema,
   SuccessMessageOutputSchema,
 } from "../schemas/outputs";
 
@@ -87,6 +91,124 @@ export function registerDevelopmentTools(
     },
   );
 
+  // ── list_env_vars ─────────────────────────────────────────────────────
+  server.registerTool(
+    "list_env_vars",
+    {
+      title: "List Environment Variables",
+      description: "Returns all environment variable objects.",
+      annotations: { readOnlyHint: true },
+      outputSchema: EnvVarListOutputSchema,
+    },
+    async () => {
+      const data = await client.get("/env-var");
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(data, null, 2) },
+        ],
+        structuredContent: { env_vars: data },
+      };
+    },
+  );
+
+  // ── save_env_var ──────────────────────────────────────────────────────
+  server.registerTool(
+    "save_env_var",
+    {
+      title: "Save Environment Variable",
+      description:
+        "Creates or updates an environment variable. When _id is provided the variable is updated, otherwise created.",
+      outputSchema: EnvVarOutputSchema,
+      inputSchema: z.object({
+        _id: z
+          .string()
+          .optional()
+          .describe("Env var ID. Omit to create a new variable."),
+        key: z.string().describe("Variable key"),
+        value: z.string().describe("Variable value"),
+      }),
+    },
+    async ({ _id, key, value }) => {
+      let result: { _id: string; key: string; value: string };
+      if (_id) {
+        result = (await client.put(`/env-var/${_id}`, {
+          key,
+          value,
+        })) as typeof result;
+      } else {
+        result = (await client.post("/env-var", {
+          key,
+          value,
+        })) as typeof result;
+      }
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(result, null, 2) },
+        ],
+        structuredContent: result as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  // ── list_secrets ──────────────────────────────────────────────────────
+  server.registerTool(
+    "list_secrets",
+    {
+      title: "List Secrets",
+      description: "Returns all secret objects.",
+      annotations: { readOnlyHint: true },
+      outputSchema: SecretListOutputSchema,
+    },
+    async () => {
+      const data = await client.get("/secret");
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(data, null, 2) },
+        ],
+        structuredContent: { secrets: data },
+      };
+    },
+  );
+
+  // ── save_secret ───────────────────────────────────────────────────────
+  server.registerTool(
+    "save_secret",
+    {
+      title: "Save Secret",
+      description:
+        "Creates or updates a secret. When _id is provided the secret is updated, otherwise created.",
+      outputSchema: SecretOutputSchema,
+      inputSchema: z.object({
+        _id: z
+          .string()
+          .optional()
+          .describe("Secret ID. Omit to create a new secret."),
+        key: z.string().describe("Secret key"),
+        value: z.string().describe("Secret value"),
+      }),
+    },
+    async ({ _id, key, value }) => {
+      let result: { _id: string; key: string; value: string };
+      if (_id) {
+        result = (await client.put(`/secret/${_id}`, {
+          key,
+          value,
+        })) as typeof result;
+      } else {
+        result = (await client.post("/secret", {
+          key,
+          value,
+        })) as typeof result;
+      }
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(result, null, 2) },
+        ],
+        structuredContent: result as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
   // ── save_function ─────────────────────────────────────────────────────
   const saveFunctionTool = server.registerTool(
     "save_function",
@@ -95,10 +217,9 @@ export function registerDevelopmentTools(
       description:
         "Creates or updates a serverless function (upsert). When _id is provided the function is replaced, otherwise created.\n\n" +
         "Environment variable and secret management:\n" +
-        "- env_vars: array of { _id?, key, value } objects. Items without _id are created as new env vars and injected. " +
-        "Items with _id are updated. Env vars not present in the array are ejected from the function.\n" +
-        "- secrets: array of { _id?, key, value } objects. Items without _id are created as new secrets and injected. " +
-        "Items with _id are updated. Secrets not present in the array are ejected from the function.\n",
+        "- env_vars: array of env var IDs to attach. IDs not present in the array are detached from the function.\n" +
+        "- secrets: array of secret IDs to attach. IDs not present in the array are detached from the function.\n" +
+        "Use save_env_var / save_secret to create or update env vars and secrets before attaching them.",
       inputSchema: z.object({
         _id: z.string().optional().describe("Function ID. Omit to create."),
         name: z.string().describe("Function name"),
@@ -116,34 +237,16 @@ export function registerDevelopmentTools(
           .enum(["javascript", "typescript"])
           .describe("Programming language"),
         env_vars: z
-          .array(
-            z.object({
-              _id: z
-                .string()
-                .optional()
-                .describe("Env var ID. Omit to create new."),
-              key: z.string().describe("Variable key"),
-              value: z.string().describe("Variable value"),
-            }),
-          )
+          .array(z.string())
           .optional()
           .describe(
-            "Environment variables to manage. New items (no _id) are created + injected. Existing items (_id) are updated. Removed items are ejected.",
+            "Env var IDs to attach. IDs not in this array are detached.",
           ),
         secrets: z
-          .array(
-            z.object({
-              _id: z
-                .string()
-                .optional()
-                .describe("Secret ID. Omit to create new."),
-              key: z.string().describe("Secret key"),
-              value: z.string().describe("Secret value"),
-            }),
-          )
+          .array(z.string())
           .optional()
           .describe(
-            "Secrets to manage. New items (no _id) are created + injected. Existing items (_id) are updated. Removed items are ejected.",
+            "Secret IDs to attach. IDs not in this array are detached.",
           ),
       }),
     },
@@ -181,31 +284,14 @@ export function registerDevelopmentTools(
         const currentEnvIds = (fn.env_vars ?? []).map((e) =>
           typeof e === "string" ? e : e._id,
         );
-        const desiredEnvIds: string[] = [];
 
-        for (const ev of env_vars) {
-          if (ev._id) {
-            await client.put(`/env-var/${ev._id}`, {
-              key: ev.key,
-              value: ev.value,
-            });
-            desiredEnvIds.push(ev._id);
-          } else {
-            const created = (await client.post("/env-var", {
-              key: ev.key,
-              value: ev.value,
-            })) as { _id: string };
-            desiredEnvIds.push(created._id);
-          }
-        }
-
-        for (const eid of desiredEnvIds) {
+        for (const eid of env_vars) {
           if (!currentEnvIds.includes(eid)) {
             await client.put(`/function/${fnId}/env-var/${eid}`);
           }
         }
         for (const eid of currentEnvIds) {
-          if (!desiredEnvIds.includes(eid)) {
+          if (!env_vars.includes(eid)) {
             await client.delete(`/function/${fnId}/env-var/${eid}`);
           }
         }
@@ -215,31 +301,14 @@ export function registerDevelopmentTools(
         const currentSecretIds = (fn.secrets ?? []).map((s) =>
           typeof s === "string" ? s : s._id,
         );
-        const desiredSecretIds: string[] = [];
 
-        for (const secret of secrets) {
-          if (secret._id) {
-            await client.put(`/secret/${secret._id}`, {
-              key: secret.key,
-              value: secret.value,
-            });
-            desiredSecretIds.push(secret._id);
-          } else {
-            const created = (await client.post("/secret", {
-              key: secret.key,
-              value: secret.value,
-            })) as { _id: string };
-            desiredSecretIds.push(created._id);
-          }
-        }
-
-        for (const sid of desiredSecretIds) {
+        for (const sid of secrets) {
           if (!currentSecretIds.includes(sid)) {
             await client.put(`/function/${fnId}/secret/${sid}`);
           }
         }
         for (const sid of currentSecretIds) {
-          if (!desiredSecretIds.includes(sid)) {
+          if (!secrets.includes(sid)) {
             await client.delete(`/function/${fnId}/secret/${sid}`);
           }
         }
