@@ -53,15 +53,11 @@ export function registerDevelopmentTools(
     env_vars: z
       .array(z.string())
       .optional()
-      .describe(
-        "Env var IDs to attach. Omit to leave unchanged; pass an empty array to detach all; otherwise IDs not in this array are detached.",
-      ),
+      .describe("Env var IDs to associate with the function."),
     secrets: z
       .array(z.string())
       .optional()
-      .describe(
-        "Secret IDs to attach. Omit to leave unchanged; pass an empty array to detach all; otherwise IDs not in this array are detached.",
-      ),
+      .describe("Secret IDs to associate with the function."),
   });
 
   // ── list_functions ────────────────────────────────────────────────────
