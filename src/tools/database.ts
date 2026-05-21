@@ -13,7 +13,7 @@ import {
 
 // ── CSV helpers ───────────────────────────────────────────────────────────────
 
-function csvEscape(val: unknown): string {
+export function csvEscape(val: unknown): string {
   const s =
     val === null || val === undefined
       ? ""
@@ -31,7 +31,7 @@ function csvEscape(val: unknown): string {
   return s;
 }
 
-function toCsv(rows: Record<string, unknown>[]): string {
+export function toCsv(rows: Record<string, unknown>[]): string {
   if (rows.length === 0) return "";
   const headers = Object.keys(rows[0]);
   const lines = [headers.map(csvEscape).join(",")];
@@ -86,7 +86,7 @@ function parseCsvLine(line: string): string[] {
   return fields;
 }
 
-function fromCsv(content: string): Record<string, unknown>[] {
+export function fromCsv(content: string): Record<string, unknown>[] {
   // Stream-parse character by character to correctly handle RFC4180 quoted
   // fields that may contain embedded newlines.
   const records: string[][] = [];
