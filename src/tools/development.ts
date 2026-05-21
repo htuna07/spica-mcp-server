@@ -23,7 +23,43 @@ export function registerDevelopmentTools(
   server: McpServer,
   client: SpicaClient,
   triggerInfo: TriggerSchemaResult,
-): { saveFunctionTool: RegisteredTool } {
+): { updateFunctionTool: RegisteredTool } {
+  // ── Shared input base schemas ─────────────────────────────────────────
+  const EnvVarInputBase = z.object({
+    key: z.string().describe("Variable key"),
+    value: z.string().describe("Variable value"),
+  });
+
+  const SecretInputBase = z.object({
+    key: z.string().describe("Secret key"),
+    value: z.string().describe("Secret value"),
+  });
+
+  const FunctionInputBase = z.object({
+    name: z.string().describe("Function name"),
+    description: z.string().optional().describe("Description"),
+    triggers: z
+      .record(triggerInfo.schema as z.ZodType)
+      .describe("Triggers keyed by handler name in function index"),
+    timeout: z
+      .number()
+      .int()
+      .describe(
+        `Execution timeout in seconds. Default: ${triggerInfo.timeout}`,
+      ),
+    language: z
+      .enum(["javascript", "typescript"])
+      .describe("Programming language"),
+    env_vars: z
+      .array(z.string())
+      .optional()
+      .describe("Env var IDs to associate with the function."),
+    secrets: z
+      .array(z.string())
+      .optional()
+      .describe("Secret IDs to associate with the function."),
+  });
+
   // ── list_functions ────────────────────────────────────────────────────
   server.registerTool(
     "list_functions",
@@ -111,36 +147,55 @@ export function registerDevelopmentTools(
     },
   );
 
-  // ── save_env_var ──────────────────────────────────────────────────────
+  // ── insert_env_var ─────────────────────────────────────────────────────
   server.registerTool(
-    "save_env_var",
+    "insert_env_var",
     {
-      title: "Save Environment Variable",
-      description:
-        "Creates or updates an environment variable. When _id is provided the variable is updated, otherwise created.",
+      title: "Insert Environment Variable",
+      description: "Creates a new environment variable.",
       outputSchema: EnvVarOutputSchema,
-      inputSchema: z.object({
-        _id: z
-          .string()
-          .optional()
-          .describe("Env var ID. Omit to create a new variable."),
-        key: z.string().describe("Variable key"),
-        value: z.string().describe("Variable value"),
-      }),
+      inputSchema: z
+        .object({
+          _id: z
+            .string()
+            .optional()
+            .describe("Optional custom ID. If omitted, MongoDB generates one."),
+        })
+        .merge(EnvVarInputBase),
     },
     async ({ _id, key, value }) => {
-      let result: { _id: string; key: string; value: string };
-      if (_id) {
-        result = (await client.put(`/env-var/${_id}`, {
-          key,
-          value,
-        })) as typeof result;
-      } else {
-        result = (await client.post("/env-var", {
-          key,
-          value,
-        })) as typeof result;
-      }
+      const body: Record<string, unknown> = { key, value };
+      if (_id !== undefined) body._id = _id;
+      const result = (await client.post("/env-var", body)) as {
+        _id: string;
+        key: string;
+        value: string;
+      };
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(result, null, 2) },
+        ],
+        structuredContent: result as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  // ── update_env_var ─────────────────────────────────────────────────────
+  server.registerTool(
+    "update_env_var",
+    {
+      title: "Update Environment Variable",
+      description: "Updates an existing environment variable. _id is required.",
+      outputSchema: EnvVarOutputSchema,
+      inputSchema: z
+        .object({ _id: z.string().describe("Env var ID. Required.") })
+        .merge(EnvVarInputBase),
+    },
+    async ({ _id, key, value }) => {
+      const result = (await client.put(`/env-var/${_id}`, {
+        key,
+        value,
+      })) as { _id: string; key: string; value: string };
       return {
         content: [
           { type: "text" as const, text: JSON.stringify(result, null, 2) },
@@ -170,36 +225,30 @@ export function registerDevelopmentTools(
     },
   );
 
-  // ── save_secret ───────────────────────────────────────────────────────
+  // ── insert_secret ──────────────────────────────────────────────────────
   server.registerTool(
-    "save_secret",
+    "insert_secret",
     {
-      title: "Save Secret",
-      description:
-        "Creates or updates a secret. When _id is provided the secret is updated, otherwise created.",
+      title: "Insert Secret",
+      description: "Creates a new secret.",
       outputSchema: SecretOutputSchema,
-      inputSchema: z.object({
-        _id: z
-          .string()
-          .optional()
-          .describe("Secret ID. Omit to create a new secret."),
-        key: z.string().describe("Secret key"),
-        value: z.string().describe("Secret value"),
-      }),
+      inputSchema: z
+        .object({
+          _id: z
+            .string()
+            .optional()
+            .describe("Optional custom ID. If omitted, MongoDB generates one."),
+        })
+        .merge(SecretInputBase),
     },
     async ({ _id, key, value }) => {
-      let result: { _id: string; key: string; value: string };
-      if (_id) {
-        result = (await client.put(`/secret/${_id}`, {
-          key,
-          value,
-        })) as typeof result;
-      } else {
-        result = (await client.post("/secret", {
-          key,
-          value,
-        })) as typeof result;
-      }
+      const body: Record<string, unknown> = { key, value };
+      if (_id !== undefined) body._id = _id;
+      const result = (await client.post("/secret", body)) as {
+        _id: string;
+        key: string;
+        value: string;
+      };
       return {
         content: [
           { type: "text" as const, text: JSON.stringify(result, null, 2) },
@@ -209,46 +258,92 @@ export function registerDevelopmentTools(
     },
   );
 
-  // ── save_function ─────────────────────────────────────────────────────
-  const saveFunctionTool = server.registerTool(
-    "save_function",
+  // ── update_secret ──────────────────────────────────────────────────────
+  server.registerTool(
+    "update_secret",
     {
-      title: "Save Function",
+      title: "Update Secret",
+      description: "Updates an existing secret. _id is required.",
+      outputSchema: SecretOutputSchema,
+      inputSchema: z
+        .object({ _id: z.string().describe("Secret ID. Required.") })
+        .merge(SecretInputBase),
+    },
+    async ({ _id, key, value }) => {
+      const result = (await client.put(`/secret/${_id}`, {
+        key,
+        value,
+      })) as { _id: string; key: string; value: string };
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(result, null, 2) },
+        ],
+        structuredContent: result as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  // ── insert_function ───────────────────────────────────────────────────
+  server.registerTool(
+    "insert_function",
+    {
+      title: "Insert Function",
       description:
-        "Creates or updates a serverless function (upsert). When _id is provided the function is replaced, otherwise created.\n\n" +
-        "Environment variable and secret management:\n" +
-        "- env_vars: omit to leave existing env var attachments unchanged; pass an empty array to detach all; otherwise IDs not present in the array are detached from the function.\n" +
-        "- secrets: omit to leave existing secret attachments unchanged; pass an empty array to detach all; otherwise IDs not present in the array are detached from the function.\n" +
-        "Use save_env_var / save_secret to create or update env vars and secrets before attaching them.",
-      inputSchema: z.object({
-        _id: z.string().optional().describe("Function ID. Omit to create."),
-        name: z.string().describe("Function name"),
-        description: z.string().optional().describe("Description"),
-        triggers: z
-          .record(triggerInfo.schema as z.ZodType)
-          .describe("Triggers keyed by handler name in function index"),
-        timeout: z
-          .number()
-          .int()
-          .describe(
-            `Execution timeout in seconds. Default: ${triggerInfo.timeout}`,
-          ),
-        language: z
-          .enum(["javascript", "typescript"])
-          .describe("Programming language"),
-        env_vars: z
-          .array(z.string())
-          .optional()
-          .describe(
-            "Env var IDs to attach. Omit to leave unchanged; pass an empty array to detach all; otherwise IDs not in this array are detached.",
-          ),
-        secrets: z
-          .array(z.string())
-          .optional()
-          .describe(
-            "Secret IDs to attach. Omit to leave unchanged; pass an empty array to detach all; otherwise IDs not in this array are detached.",
-          ),
-      }),
+        "Creates a new serverless function. Use insert_env_var / insert_secret to create env vars and secrets before associating them.",
+      inputSchema: z
+        .object({
+          _id: z
+            .string()
+            .optional()
+            .describe("Optional custom ID. If omitted, MongoDB generates one."),
+        })
+        .merge(FunctionInputBase),
+    },
+    async ({ _id, name, description, triggers, timeout, language, env_vars, secrets }) => {
+      const fnBody: {
+        _id?: string;
+        name: string;
+        triggers: Record<string, Trigger>;
+        timeout: number;
+        language: string;
+        description?: string;
+      } = { name, triggers, timeout, language };
+      if (description !== undefined) fnBody.description = description;
+      if (_id !== undefined) fnBody._id = _id;
+
+      let fn = (await client.post("/function", fnBody)) as SpicaFunction;
+      const fnId = fn._id;
+
+      if (env_vars !== undefined) {
+        for (const eid of env_vars) {
+          await client.put(`/function/${fnId}/env-var/${eid}`);
+        }
+      }
+
+      if (secrets !== undefined) {
+        for (const sid of secrets) {
+          await client.put(`/function/${fnId}/secret/${sid}`);
+        }
+      }
+
+      fn = (await client.get(`/function/${fnId}`)) as SpicaFunction;
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(fn, null, 2) }],
+        structuredContent: fn as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  // ── update_function ───────────────────────────────────────────────────
+  const updateFunctionTool = server.registerTool(
+    "update_function",
+    {
+      title: "Update Function",
+      description:
+        "Replaces an existing serverless function. _id is required. Use insert_env_var / insert_secret to create or update env vars and secrets before associating them.",
+      inputSchema: z
+        .object({ _id: z.string().describe("Function ID. Required.") })
+        .merge(FunctionInputBase),
     },
     async ({
       _id,
@@ -269,16 +364,8 @@ export function registerDevelopmentTools(
       } = { name, triggers, timeout, language };
       if (description !== undefined) fnBody.description = description;
 
-      let fn: SpicaFunction;
-      let fnId: string;
-
-      if (_id) {
-        fn = (await client.put(`/function/${_id}`, fnBody)) as SpicaFunction;
-        fnId = _id;
-      } else {
-        fn = (await client.post("/function", fnBody)) as SpicaFunction;
-        fnId = fn._id;
-      }
+      let fn = (await client.put(`/function/${_id}`, fnBody)) as SpicaFunction;
+      const fnId = _id;
 
       if (env_vars !== undefined) {
         const currentEnvIds = (fn.env_vars ?? []).map((e) =>
@@ -389,5 +476,5 @@ export function registerDevelopmentTools(
     },
   );
 
-  return { saveFunctionTool };
+  return { updateFunctionTool };
 }

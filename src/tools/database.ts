@@ -140,6 +140,89 @@ function fromCsv(content: string): Record<string, unknown>[] {
   });
 }
 
+// ── Shared bucket field schema ───────────────────────────────────────────────
+const BucketInputBase = z.object({
+  title: z
+    .string()
+    .min(4)
+    .max(100)
+    .describe("Display title of the bucket"),
+  icon: z
+    .string()
+    .optional()
+    .describe("Material icon identifier. Default: 'view_stream'"),
+  description: z
+    .string()
+    .min(5)
+    .max(250)
+    .describe("Description of the bucket"),
+  primary: z.string().describe("Primary field key used as display column"),
+  history: z
+    .boolean()
+    .optional()
+    .describe("Enable document history tracking. Default: false"),
+  category: z
+    .string()
+    .optional()
+    .describe("Category name for grouping buckets"),
+  properties: z
+    .record(BucketPropertySchema)
+    .describe(
+      "Field definitions keyed by field name. Property names must be lowercase with underscores/digits only (pattern: ^(?!(_id)$)([a-z_0-9]*)+$). At least one property is required.",
+    ),
+  order: z.number().optional().describe("Display order of the bucket"),
+  required: z
+    .array(z.string())
+    .optional()
+    .describe("Array of required field names"),
+  acl: z.object({
+    read: z
+      .string()
+      .describe(
+        "ACL expression for read access. Runs for only users. Example: 'document.owner==auth._id' (users can only read their own data). Default: 'true==true'",
+      ),
+    write: z
+      .string()
+      .describe(
+        "ACL expression for write access. Runs for only users. Example: 'document.owner==auth._id' (users can only write their own data). Default: 'true==true'",
+      ),
+  }),
+  documentSettings: z
+    .object({
+      countLimit: z
+        .number()
+        .min(1)
+        .optional()
+        .describe("Maximum number of documents this bucket can hold"),
+      limitExceedBehaviour: z
+        .enum(["prevent", "remove"])
+        .optional()
+        .describe(
+          "'prevent': reject new inserts when limit is reached. 'remove': delete oldest documents to stay within limit",
+        ),
+    })
+    .optional()
+    .describe("Document count limits and overflow behaviour"),
+  indexes: z
+    .array(
+      z.object({
+        definition: z
+          .record(z.union([z.number().int(), z.string()]))
+          .describe(
+            "Field paths and index direction (1 for ascending, -1 for descending, or 'text' for text index)",
+          ),
+        options: z
+          .record(z.any())
+          .optional()
+          .describe(
+            "Additional MongoDB index options (e.g. unique, sparse, expireAfterSeconds for TTL)",
+          ),
+      }),
+    )
+    .optional()
+    .describe("Custom database indexes"),
+});
+
 export function registerDatabaseTools(
   server: McpServer,
   client: SpicaClient,
@@ -164,13 +247,13 @@ export function registerDatabaseTools(
     },
   );
 
-  // ── save_bucket ───────────────────────────────────────────────────────
+  // ── insert_bucket ─────────────────────────────────────────────────────
   server.registerTool(
-    "save_bucket",
+    "insert_bucket",
     {
-      title: "Save Bucket",
+      title: "Insert Bucket",
       description:
-        "Creates or updates a bucket schema (upsert). When _id is provided the bucket is replaced, otherwise created.\n\n" +
+        "Creates a new bucket schema.\n\n" +
         "The 'properties' field defines the bucket's data model. Each property has a 'type' which can be:\n" +
         "- Standard types: string, number, boolean, object, array\n" +
         "- Spica types: relation (link to another bucket), storage (file reference), richtext, textarea, color, " +
@@ -178,98 +261,49 @@ export function registerDatabaseTools(
         "For 'relation' type: bucketId and relationType (onetoone/onetomany) are required.\n" +
         "For 'object' type: use nested 'properties' to define sub-fields.\n" +
         "For 'array'/'multiselect' type: use 'items' to define the element schema.",
-      inputSchema: z.object({
-        _id: z.string().optional().describe("Bucket ID. Omit to create."),
-        title: z
-          .string()
-          .min(4)
-          .max(100)
-          .describe("Display title of the bucket"),
-        icon: z
-          .string()
-          .optional()
-          .describe("Material icon identifier. Default: 'view_stream'"),
-        description: z
-          .string()
-          .min(5)
-          .max(250)
-          .describe("Description of the bucket"),
-        primary: z
-          .string()
-          .describe("Primary field key used as display column"),
-        history: z
-          .boolean()
-          .optional()
-          .describe("Enable document history tracking. Default: false"),
-        category: z
-          .string()
-          .optional()
-          .describe("Category name for grouping buckets"),
-        properties: z
-          .record(BucketPropertySchema)
-          .describe(
-            "Field definitions keyed by field name. Property names must be lowercase with underscores/digits only (pattern: ^(?!(_id)$)([a-z_0-9]*)+$). At least one property is required.",
-          ),
-        order: z.number().optional().describe("Display order of the bucket"),
-        required: z
-          .array(z.string())
-          .optional()
-          .describe("Array of required field names"),
-        acl: z.object({
-          read: z
+      inputSchema: z
+        .object({
+          _id: z
             .string()
-            .describe(
-              "ACL expression for read access. Runs for only users. Example: 'document.owner==auth._id' (users can only read their own data). Default: 'true==true'",
-            ),
-          write: z
-            .string()
-            .describe(
-              "ACL expression for write access. Runs for only users. Example: 'document.owner==auth._id' (users can only write their own data). Default: 'true==true'",
-            ),
-        }),
-        documentSettings: z
-          .object({
-            countLimit: z
-              .number()
-              .min(1)
-              .optional()
-              .describe("Maximum number of documents this bucket can hold"),
-            limitExceedBehaviour: z
-              .enum(["prevent", "remove"])
-              .optional()
-              .describe(
-                "'prevent': reject new inserts when limit is reached. 'remove': delete oldest documents to stay within limit",
-              ),
-          })
-          .optional()
-          .describe("Document count limits and overflow behaviour"),
-        indexes: z
-          .array(
-            z.object({
-              definition: z
-                .record(z.union([z.number().int(), z.string()]))
-                .describe(
-                  "Field paths and index direction (1 for ascending, -1 for descending, or 'text' for text index)",
-                ),
-              options: z
-                .record(z.any())
-                .optional()
-                .describe(
-                  "Additional MongoDB index options (e.g. unique, sparse, expireAfterSeconds for TTL)",
-                ),
-            }),
-          )
-          .optional()
-          .describe("Custom database indexes"),
-      }),
+            .optional()
+            .describe("Optional custom ID. If omitted, MongoDB generates one."),
+        })
+        .merge(BucketInputBase),
+    },
+    async ({ _id, ...rest }) => {
+      const bucket = await client.post(
+        "/bucket",
+        _id !== undefined ? { _id, ...rest } : rest,
+      );
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(bucket, null, 2) },
+        ],
+        structuredContent: bucket as Record<string, unknown>,
+      };
+    },
+  );
+
+  // ── update_bucket ─────────────────────────────────────────────────────
+  server.registerTool(
+    "update_bucket",
+    {
+      title: "Update Bucket",
+      description:
+        "Replaces an existing bucket schema. _id is required.\n\n" +
+        "The 'properties' field defines the bucket's data model. Each property has a 'type' which can be:\n" +
+        "- Standard types: string, number, boolean, object, array\n" +
+        "- Spica types: relation (link to another bucket), storage (file reference), richtext, textarea, color, " +
+        "date, location (GeoJSON Point), multiselect, json, hash, encrypted\n\n" +
+        "For 'relation' type: bucketId and relationType (onetoone/onetomany) are required.\n" +
+        "For 'object' type: use nested 'properties' to define sub-fields.\n" +
+        "For 'array'/'multiselect' type: use 'items' to define the element schema.",
+      inputSchema: z
+        .object({ _id: z.string().describe("Bucket ID. Required.") })
+        .merge(BucketInputBase),
     },
     async ({ _id, ...body }) => {
-      let bucket: unknown;
-      if (_id) {
-        bucket = await client.put(`/bucket/${_id}`, body);
-      } else {
-        bucket = await client.post("/bucket", body);
-      }
+      const bucket = await client.put(`/bucket/${_id}`, body);
       return {
         content: [
           { type: "text" as const, text: JSON.stringify(bucket, null, 2) },
