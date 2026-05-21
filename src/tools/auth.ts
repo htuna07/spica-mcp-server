@@ -210,7 +210,8 @@ export function registerAuthTools(
       description:
         "Creates or updates an API key (upsert). When _id is provided the key is updated, otherwise created. " +
         "Accepts a policies array of existing policy IDs to attach. " +
-        "Policies not present in the array will be detached from the key. " +
+        "When policies is omitted, existing policy attachments remain unchanged. " +
+        "When policies is provided, policies not present in the array will be detached from the key (pass an empty array to detach all). " +
         "Use save_policy to create or update a policy before attaching it.",
       inputSchema: z.object({
         _id: z
@@ -314,7 +315,8 @@ export function registerAuthTools(
       description:
         "Creates or updates an identity (upsert). When _id is provided the identity is updated, otherwise created. " +
         "Accepts a policies array of existing policy IDs to attach. " +
-        "Policies not present in the array will be detached from the identity. " +
+        "When policies is omitted, existing policy attachments remain unchanged. " +
+        "When policies is provided, policies not present in the array will be detached from the identity (pass an empty array to detach all). " +
         "Use save_policy to create or update a policy before attaching it.",
       inputSchema: z.object({
         _id: z.string().optional().describe("Identity ID. Omit to create."),
