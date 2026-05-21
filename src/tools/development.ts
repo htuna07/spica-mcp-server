@@ -289,11 +289,7 @@ export function registerDevelopmentTools(
     {
       title: "Insert Function",
       description:
-        "Creates a new serverless function.\n\n" +
-        "Environment variable and secret management:\n" +
-        "- env_vars: omit to attach none; pass an array of IDs to attach them to the new function.\n" +
-        "- secrets: omit to attach none; pass an array of IDs to attach them to the new function.\n" +
-        "Use insert_env_var / insert_secret to create env vars and secrets before attaching them.",
+        "Creates a new serverless function. Use insert_env_var / insert_secret to create env vars and secrets before associating them.",
       inputSchema: z
         .object({
           _id: z
@@ -344,11 +340,7 @@ export function registerDevelopmentTools(
     {
       title: "Update Function",
       description:
-        "Replaces an existing serverless function. _id is required.\n\n" +
-        "Environment variable and secret management:\n" +
-        "- env_vars: omit to leave existing env var attachments unchanged; pass an empty array to detach all; otherwise IDs not present in the array are detached from the function.\n" +
-        "- secrets: omit to leave existing secret attachments unchanged; pass an empty array to detach all; otherwise IDs not present in the array are detached from the function.\n" +
-        "Use insert_env_var / insert_secret to create or update env vars and secrets before attaching them.",
+        "Replaces an existing serverless function. _id is required. Use insert_env_var / insert_secret to create or update env vars and secrets before associating them.",
       inputSchema: z
         .object({ _id: z.string().describe("Function ID. Required.") })
         .merge(FunctionInputBase),

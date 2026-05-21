@@ -183,9 +183,7 @@ const ApiKeyInputBase = z.object({
   policies: z
     .array(z.string())
     .optional()
-    .describe(
-      "Policy IDs to attach. Omit to leave unchanged; pass an empty array to detach all; otherwise IDs not in this array are detached.",
-    ),
+    .describe("Policy IDs to associate with the API key."),
 });
 
 const PolicyInputBase = z.object({
@@ -229,9 +227,7 @@ export function registerAuthTools(
     {
       title: "Insert API Key",
       description:
-        "Creates a new API key. " +
-        "Accepts a policies array of existing policy IDs to attach. " +
-        "Use insert_policy to create a policy before attaching it.",
+        "Creates a new API key. Use insert_policy to create a policy before associating it.",
       inputSchema: z
         .object({
           _id: z
@@ -276,11 +272,7 @@ export function registerAuthTools(
     {
       title: "Update API Key",
       description:
-        "Updates an existing API key. _id is required. " +
-        "Accepts a policies array of existing policy IDs to attach. " +
-        "When policies is omitted, existing policy attachments remain unchanged. " +
-        "When policies is provided, policies not present in the array will be detached from the key (pass an empty array to detach all). " +
-        "Use insert_policy to create or update a policy before attaching it.",
+        "Updates an existing API key. _id is required. Use insert_policy to create or update a policy before associating it.",
       inputSchema: z
         .object({ _id: z.string().describe("API key ID. Required.") })
         .merge(ApiKeyInputBase),
@@ -361,9 +353,7 @@ export function registerAuthTools(
     {
       title: "Insert Identity",
       description:
-        "Creates a new identity. " +
-        "Accepts a policies array of existing policy IDs to attach. " +
-        "Use insert_policy to create a policy before attaching it.",
+        "Creates a new identity. Use insert_policy to create a policy before associating it.",
       inputSchema: z.object({
         _id: z
           .string()
@@ -374,7 +364,7 @@ export function registerAuthTools(
         policies: z
           .array(z.string())
           .optional()
-          .describe("Policy IDs to attach to the new identity."),
+          .describe("Policy IDs to associate with the identity."),
       }),
     },
     async ({ _id, identifier, password, policies }) => {
@@ -410,11 +400,7 @@ export function registerAuthTools(
     {
       title: "Update Identity",
       description:
-        "Updates an existing identity. _id is required. " +
-        "Accepts a policies array of existing policy IDs to attach. " +
-        "When policies is omitted, existing policy attachments remain unchanged. " +
-        "When policies is provided, policies not present in the array will be detached from the identity (pass an empty array to detach all). " +
-        "Use insert_policy to create or update a policy before attaching it.",
+        "Updates an existing identity. _id is required. Use insert_policy to create or update a policy before associating it.",
       inputSchema: z.object({
         _id: z.string().describe("Identity ID. Required."),
         identifier: z
@@ -429,7 +415,7 @@ export function registerAuthTools(
           .array(z.string())
           .optional()
           .describe(
-            "Policy IDs to attach. Policies not in this array are detached.",
+            "Policy IDs to associate with the identity.",
           ),
       }),
     },
