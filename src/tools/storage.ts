@@ -7,6 +7,15 @@ import {
   StorageObjectListOutputSchema,
 } from "../schemas/outputs";
 
+// ── Shared storage object field schema ────────────────────────────────────────────
+const StorageObjectInputBase = z.object({
+  name: z.string().describe("File name"),
+  content: z.object({
+    type: z.string().describe("MIME type, e.g. text/plain, image/png"),
+    data: z.string().describe("Base64-encoded content data"),
+  }),
+});
+
 export function registerStorageTools(
   server: McpServer,
   client: SpicaClient,
@@ -48,39 +57,52 @@ export function registerStorageTools(
     },
   );
 
-  // ── save_storage_object ───────────────────────────────────────────────
+  // ── insert_storage_object ─────────────────────────────────────────────
   server.registerTool(
-    "save_storage_object",
+    "insert_storage_object",
     {
-      title: "Save Storage Object",
+      title: "Insert Storage Object",
       description:
-        "Creates or updates a storage object (upsert). When _id is provided the object is replaced, otherwise created. " +
-        "Content data must be base64-encoded.",
-      inputSchema: z.object({
-        _id: z
-          .string()
-          .optional()
-          .describe("Storage object ID. Omit to create a new object."),
-        name: z.string().describe("File name"),
-        content: z.object({
-          type: z.string().describe("MIME type, e.g. text/plain, image/png"),
-          data: z.string().describe("Base64-encoded content data"),
-        }),
-      }),
+        "Creates a new storage object. Content data must be base64-encoded.",
+      inputSchema: z
+        .object({
+          _id: z
+            .string()
+            .optional()
+            .describe("Optional custom ID. If omitted, MongoDB generates one."),
+        })
+        .merge(StorageObjectInputBase),
     },
     async ({ _id, name, content }) => {
-      let result: StorageObject;
-      if (_id) {
-        result = (await client.put(`/storage/${_id}`, {
-          name,
-          content,
-        })) as StorageObject;
-      } else {
-        const arr = (await client.post("/storage", [
-          { name, content },
-        ])) as StorageObject[];
-        result = Array.isArray(arr) ? arr[0] : arr;
-      }
+      const obj: Record<string, unknown> = { name, content };
+      if (_id !== undefined) obj._id = _id;
+      const arr = (await client.post("/storage", [obj])) as StorageObject[];
+      const result: StorageObject = Array.isArray(arr) ? arr[0] : arr;
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(result, null, 2) },
+        ],
+        structuredContent: result as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  // ── update_storage_object ─────────────────────────────────────────────
+  server.registerTool(
+    "update_storage_object",
+    {
+      title: "Update Storage Object",
+      description:
+        "Replaces an existing storage object. _id is required. Content data must be base64-encoded.",
+      inputSchema: z
+        .object({ _id: z.string().describe("Storage object ID. Required.") })
+        .merge(StorageObjectInputBase),
+    },
+    async ({ _id, name, content }) => {
+      const result = (await client.put(`/storage/${_id}`, {
+        name,
+        content,
+      })) as StorageObject;
       return {
         content: [
           { type: "text" as const, text: JSON.stringify(result, null, 2) },

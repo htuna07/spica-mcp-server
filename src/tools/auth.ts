@@ -175,6 +175,27 @@ const PolicyStatementSchema = z.discriminatedUnion("action", [
   twoRes("passport:user:policy:remove",      "passport:user:policy"),
 ]);
 
+// ── Shared input base schemas ─────────────────────────────────────────────────
+const ApiKeyInputBase = z.object({
+  name: z.string().describe("Name of the API key"),
+  description: z.string().optional().describe("Description"),
+  active: z.boolean().describe("Whether the key is active"),
+  policies: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Policy IDs to attach. Omit to leave unchanged; pass an empty array to detach all; otherwise IDs not in this array are detached.",
+    ),
+});
+
+const PolicyInputBase = z.object({
+  name: z.string().describe("Policy name"),
+  description: z.string().optional().describe("Policy description"),
+  statement: z
+    .array(PolicyStatementSchema)
+    .describe("Array of policy statements"),
+});
+
 export function registerAuthTools(
   server: McpServer,
   client: SpicaClient,
@@ -202,32 +223,67 @@ export function registerAuthTools(
     },
   );
 
-  // ── save_apikey ───────────────────────────────────────────────────────
+  // ── insert_apikey ─────────────────────────────────────────────────────
   server.registerTool(
-    "save_apikey",
+    "insert_apikey",
     {
-      title: "Save API Key",
+      title: "Insert API Key",
       description:
-        "Creates or updates an API key (upsert). When _id is provided the key is updated, otherwise created. " +
+        "Creates a new API key. " +
+        "Accepts a policies array of existing policy IDs to attach. " +
+        "Use insert_policy to create a policy before attaching it.",
+      inputSchema: z
+        .object({
+          _id: z
+            .string()
+            .optional()
+            .describe("Optional custom ID. If omitted, MongoDB generates one."),
+        })
+        .merge(ApiKeyInputBase),
+    },
+    async ({ _id, name, description, active, policies }) => {
+      const body: {
+        name: string;
+        active: boolean;
+        description?: string;
+        _id?: string;
+      } = { name, active };
+      if (description !== undefined) body.description = description;
+      if (_id !== undefined) body._id = _id;
+
+      let apikey = (await client.post("/passport/apikey", body)) as ApiKey;
+      const apikeyId = apikey._id;
+
+      if (policies !== undefined) {
+        for (const pid of policies) {
+          await client.put(`/passport/apikey/${apikeyId}/policy/${pid}`);
+        }
+        apikey = (await client.get(`/passport/apikey/${apikeyId}`)) as ApiKey;
+      }
+
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(apikey, null, 2) },
+        ],
+        structuredContent: apikey as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  // ── update_apikey ─────────────────────────────────────────────────────
+  server.registerTool(
+    "update_apikey",
+    {
+      title: "Update API Key",
+      description:
+        "Updates an existing API key. _id is required. " +
         "Accepts a policies array of existing policy IDs to attach. " +
         "When policies is omitted, existing policy attachments remain unchanged. " +
         "When policies is provided, policies not present in the array will be detached from the key (pass an empty array to detach all). " +
-        "Use save_policy to create or update a policy before attaching it.",
-      inputSchema: z.object({
-        _id: z
-          .string()
-          .optional()
-          .describe("API key ID. Omit to create a new key."),
-        name: z.string().describe("Name of the API key"),
-        description: z.string().optional().describe("Description"),
-        active: z.boolean().describe("Whether the key is active"),
-        policies: z
-          .array(z.string())
-          .optional()
-          .describe(
-            "Policy IDs to attach. Policies not in this array are detached.",
-          ),
-      }),
+        "Use insert_policy to create or update a policy before attaching it.",
+      inputSchema: z
+        .object({ _id: z.string().describe("API key ID. Required.") })
+        .merge(ApiKeyInputBase),
     },
     async ({ _id, name, description, active, policies }) => {
       const body: { name: string; active: boolean; description?: string } = {
@@ -236,16 +292,8 @@ export function registerAuthTools(
       };
       if (description !== undefined) body.description = description;
 
-      let apikey: ApiKey;
-      let apikeyId: string;
-
-      if (_id) {
-        apikey = (await client.put(`/passport/apikey/${_id}`, body)) as ApiKey;
-        apikeyId = _id;
-      } else {
-        apikey = (await client.post("/passport/apikey", body)) as ApiKey;
-        apikeyId = apikey._id;
-      }
+      let apikey = (await client.put(`/passport/apikey/${_id}`, body)) as ApiKey;
+      const apikeyId = _id;
 
       if (policies !== undefined) {
         const currentPolicies = apikey.policies ?? [];
@@ -307,24 +355,76 @@ export function registerAuthTools(
     },
   );
 
-  // ── save_identity ─────────────────────────────────────────────────────
+  // ── insert_identity ───────────────────────────────────────────────────
   server.registerTool(
-    "save_identity",
+    "insert_identity",
     {
-      title: "Save Identity",
+      title: "Insert Identity",
       description:
-        "Creates or updates an identity (upsert). When _id is provided the identity is updated, otherwise created. " +
+        "Creates a new identity. " +
+        "Accepts a policies array of existing policy IDs to attach. " +
+        "Use insert_policy to create a policy before attaching it.",
+      inputSchema: z.object({
+        _id: z
+          .string()
+          .optional()
+          .describe("Optional custom ID. If omitted, MongoDB generates one."),
+        identifier: z.string().describe("Unique identifier for the identity"),
+        password: z.string().describe("Password. Required on create."),
+        policies: z
+          .array(z.string())
+          .optional()
+          .describe("Policy IDs to attach to the new identity."),
+      }),
+    },
+    async ({ _id, identifier, password, policies }) => {
+      const identityBody: Record<string, unknown> = { identifier, password };
+      if (_id !== undefined) identityBody._id = _id;
+      let identity = (await client.post(
+        "/passport/identity",
+        identityBody,
+      )) as Identity;
+      const identityId = identity._id;
+
+      if (policies !== undefined) {
+        for (const pid of policies) {
+          await client.put(`/passport/identity/${identityId}/policy/${pid}`);
+        }
+        identity = (await client.get(
+          `/passport/identity/${identityId}`,
+        )) as Identity;
+      }
+
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(identity, null, 2) },
+        ],
+        structuredContent: identity as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  // ── update_identity ───────────────────────────────────────────────────
+  server.registerTool(
+    "update_identity",
+    {
+      title: "Update Identity",
+      description:
+        "Updates an existing identity. _id is required. " +
         "Accepts a policies array of existing policy IDs to attach. " +
         "When policies is omitted, existing policy attachments remain unchanged. " +
         "When policies is provided, policies not present in the array will be detached from the identity (pass an empty array to detach all). " +
-        "Use save_policy to create or update a policy before attaching it.",
+        "Use insert_policy to create or update a policy before attaching it.",
       inputSchema: z.object({
-        _id: z.string().optional().describe("Identity ID. Omit to create."),
-        identifier: z.string().describe("Unique identifier for the identity"),
+        _id: z.string().describe("Identity ID. Required."),
+        identifier: z
+          .string()
+          .optional()
+          .describe("Unique identifier for the identity"),
         password: z
           .string()
           .optional()
-          .describe("Password. Required on create, optional on update."),
+          .describe("Password. Optional on update."),
         policies: z
           .array(z.string())
           .optional()
@@ -334,25 +434,15 @@ export function registerAuthTools(
       }),
     },
     async ({ _id, identifier, password, policies }) => {
-      let identity: Identity;
-      let identityId: string;
+      const body: { identifier?: string; password?: string } = {};
+      if (identifier !== undefined) body.identifier = identifier;
+      if (password !== undefined) body.password = password;
 
-      if (_id) {
-        const body: { identifier?: string; password?: string } = {};
-        if (identifier !== undefined) body.identifier = identifier;
-        if (password !== undefined) body.password = password;
-        identity = (await client.put(
-          `/passport/identity/${_id}`,
-          body,
-        )) as Identity;
-        identityId = _id;
-      } else {
-        identity = (await client.post("/passport/identity", {
-          identifier,
-          password,
-        })) as Identity;
-        identityId = identity._id;
-      }
+      let identity = (await client.put(
+        `/passport/identity/${_id}`,
+        body,
+      )) as Identity;
+      const identityId = _id;
 
       if (policies !== undefined) {
         const currentPolicies = identity.policies ?? [];
@@ -419,35 +509,55 @@ export function registerAuthTools(
     },
   );
 
-  // ── save_policy ───────────────────────────────────────────────────────
+  // ── insert_policy ──────────────────────────────────────────────────────
   server.registerTool(
-    "save_policy",
+    "insert_policy",
     {
-      title: "Save Policy",
-      description:
-        "Creates or updates an access policy (upsert). When _id is provided the policy is replaced, otherwise created.",
-      inputSchema: z.object({
-        _id: z.string().optional().describe("Policy ID. Omit to create."),
-        name: z.string().describe("Policy name"),
-        description: z.string().optional().describe("Policy description"),
-        statement: z
-          .array(PolicyStatementSchema)
-          .describe("Array of policy statements"),
-      }),
+      title: "Insert Policy",
+      description: "Creates a new access policy.",
+      inputSchema: z
+        .object({
+          _id: z
+            .string()
+            .optional()
+            .describe("Optional custom ID. If omitted, MongoDB generates one."),
+        })
+        .merge(PolicyInputBase),
+    },
+    async ({ _id, name, description, statement }) => {
+      const body: PolicyBase & { _id?: string } = { name, statement };
+      if (description !== undefined) body.description = description;
+      if (_id !== undefined) body._id = _id;
+
+      const policy = (await client.post("/passport/policy", body)) as PolicyBase;
+
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(policy, null, 2) },
+        ],
+        structuredContent: policy as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  // ── update_policy ──────────────────────────────────────────────────────
+  server.registerTool(
+    "update_policy",
+    {
+      title: "Update Policy",
+      description: "Replaces an existing access policy. _id is required.",
+      inputSchema: z
+        .object({ _id: z.string().describe("Policy ID. Required.") })
+        .merge(PolicyInputBase),
     },
     async ({ _id, name, description, statement }) => {
       const body: PolicyBase = { name, statement };
       if (description !== undefined) body.description = description;
 
-      let policy: PolicyBase;
-      if (_id) {
-        policy = (await client.put(
-          `/passport/policy/${_id}`,
-          body,
-        )) as PolicyBase;
-      } else {
-        policy = (await client.post("/passport/policy", body)) as PolicyBase;
-      }
+      const policy = (await client.put(
+        `/passport/policy/${_id}`,
+        body,
+      )) as PolicyBase;
 
       return {
         content: [
