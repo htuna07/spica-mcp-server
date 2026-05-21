@@ -217,8 +217,8 @@ export function registerDevelopmentTools(
       description:
         "Creates or updates a serverless function (upsert). When _id is provided the function is replaced, otherwise created.\n\n" +
         "Environment variable and secret management:\n" +
-        "- env_vars: array of env var IDs to attach. IDs not present in the array are detached from the function.\n" +
-        "- secrets: array of secret IDs to attach. IDs not present in the array are detached from the function.\n" +
+        "- env_vars: omit to leave existing env var attachments unchanged; pass an empty array to detach all; otherwise IDs not present in the array are detached from the function.\n" +
+        "- secrets: omit to leave existing secret attachments unchanged; pass an empty array to detach all; otherwise IDs not present in the array are detached from the function.\n" +
         "Use save_env_var / save_secret to create or update env vars and secrets before attaching them.",
       inputSchema: z.object({
         _id: z.string().optional().describe("Function ID. Omit to create."),
@@ -240,13 +240,13 @@ export function registerDevelopmentTools(
           .array(z.string())
           .optional()
           .describe(
-            "Env var IDs to attach. IDs not in this array are detached.",
+            "Env var IDs to attach. Omit to leave unchanged; pass an empty array to detach all; otherwise IDs not in this array are detached.",
           ),
         secrets: z
           .array(z.string())
           .optional()
           .describe(
-            "Secret IDs to attach. IDs not in this array are detached.",
+            "Secret IDs to attach. Omit to leave unchanged; pass an empty array to detach all; otherwise IDs not in this array are detached.",
           ),
       }),
     },
