@@ -140,6 +140,7 @@ export const FunctionOutputSchema = {
     )
     .optional(),
   memoryLimit: z.number().optional(),
+  order: z.number().optional(),
 };
 
 export const FunctionListOutputSchema = {
@@ -191,6 +192,7 @@ export const PolicyOutputSchema = {
   name: z.string(),
   description: z.string().optional(),
   statement: z.array(PolicyStatementOutputSchema),
+  system: z.boolean().optional(),
 };
 
 export const PolicyListOutputSchema = {
@@ -200,7 +202,7 @@ export const PolicyListOutputSchema = {
 export const ApiKeyOutputSchema = {
   _id: ObjectId,
   name: z.string(),
-  description: z.string().optional(),
+  description: z.string().nullish(),
   active: z.boolean(),
   key: z.string().optional(),
   policies: z.array(z.string()).optional(),
@@ -214,8 +216,18 @@ export const IdentityOutputSchema = {
   _id: ObjectId,
   identifier: z.string(),
   policies: z.array(z.string()).optional(),
+  attributes: z.record(z.any()).optional(),
   failedAttempts: z.array(z.any()).optional(),
-  lastLogin: z.string().optional(),
+  lastLogin: z.string().nullish(),
+  deactivateJwtsBefore: z.number().optional(),
+  authFactor: z
+    .object({
+      type: z.string(),
+      title: z.string().optional(),
+      description: z.string().optional(),
+      config: z.record(z.any()).optional(),
+    })
+    .optional(),
 };
 
 export const IdentityListOutputSchema = {
@@ -226,6 +238,9 @@ export const UserOutputSchema = {
   _id: ObjectId,
   username: z.string().optional(),
   policies: z.array(z.string()).optional(),
+  failedAttempts: z.array(z.any()).optional(),
+  lastLogin: z.string().nullish(),
+  deactivateJwtsBefore: z.number().optional(),
 };
 
 export const UserListOutputSchema = {
@@ -243,7 +258,7 @@ export const StorageObjectOutputSchema = {
   content: z
     .object({
       type: z.string().describe("MIME type"),
-      size: z.number().optional().describe("Size in bytes"),
+      size: z.union([z.number(), z.string()]).optional().describe("Size in bytes"),
     })
     .optional(),
 };
@@ -259,7 +274,7 @@ export const ActivityOutputSchema = {
   identifier: z.string().optional(),
   username: z.string().optional(),
   action: z.number().optional(),
-  resource: z.array(z.string()).optional(),
+  resource: z.array(z.any()).optional(),
   created_at: z.string().optional(),
 };
 
