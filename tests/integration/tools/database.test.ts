@@ -177,4 +177,103 @@ describe("registerDatabaseTools", () => {
       );
     });
   });
+
+  describe("export_bucket_data", () => {
+    it("calls GET /bucket/{id}/data to fetch rows", async () => {
+      mockClient.get.mockResolvedValue([{ _id: "d1", name: "Alice" }]);
+      const os = await import("os");
+      await handlers["export_bucket_data"]({
+        bucketId: "b1",
+        format: "json",
+        directory: os.tmpdir(),
+        fileName: "test-export",
+      });
+      expect(mockClient.get).toHaveBeenCalledWith(
+        "/bucket/b1/data",
+        expect.any(Object),
+        expect.any(Object),
+      );
+    });
+
+    it("writes a JSON file and returns its path and document count", async () => {
+      mockClient.get.mockResolvedValue([{ _id: "d1" }, { _id: "d2" }]);
+      const os = await import("os");
+      const result = (await handlers["export_bucket_data"]({
+        bucketId: "b1",
+        format: "json",
+        directory: os.tmpdir(),
+        fileName: "test-export-json",
+      })) as { structuredContent: { filePath: string; totalDocuments: number; format: string } };
+      expect(result.structuredContent.totalDocuments).toBe(2);
+      expect(result.structuredContent.format).toBe("json");
+      expect(result.structuredContent.filePath).toMatch(/test-export-json\.json$/);
+    });
+
+    it("writes a CSV file when format is csv", async () => {
+      mockClient.get.mockResolvedValue([{ name: "Alice" }]);
+      const os = await import("os");
+      const result = (await handlers["export_bucket_data"]({
+        bucketId: "b1",
+        format: "csv",
+        directory: os.tmpdir(),
+        fileName: "test-export-csv",
+      })) as { structuredContent: { filePath: string; format: string } };
+      expect(result.structuredContent.format).toBe("csv");
+      expect(result.structuredContent.filePath).toMatch(/test-export-csv\.csv$/);
+    });
+  });
+
+  describe("import_bucket_data", () => {
+    it("reads a JSON file and POSTs each row to /bucket/{id}/data", async () => {
+      const os = await import("os");
+      const fs = await import("fs");
+      const path = await import("path");
+      const tmpFile = path.join(os.tmpdir(), "test-import.json");
+      fs.writeFileSync(tmpFile, JSON.stringify([{ name: "Alice" }, { name: "Bob" }]));
+      mockClient.post.mockResolvedValue({ _id: "new" });
+      await handlers["import_bucket_data"]({
+        bucketId: "b1",
+        filePath: tmpFile,
+        concurrency: 10,
+      });
+      expect(mockClient.post).toHaveBeenCalledTimes(2);
+      expect(mockClient.post).toHaveBeenCalledWith(
+        "/bucket/b1/data",
+        expect.objectContaining({ name: "Alice" }),
+      );
+      fs.unlinkSync(tmpFile);
+    });
+
+    it("reads a CSV file and POSTs each row", async () => {
+      const os = await import("os");
+      const fs = await import("fs");
+      const path = await import("path");
+      const tmpFile = path.join(os.tmpdir(), "test-import.csv");
+      fs.writeFileSync(tmpFile, "name,score\nAlice,10\nBob,20");
+      mockClient.post.mockResolvedValue({ _id: "new" });
+      await handlers["import_bucket_data"]({
+        bucketId: "b1",
+        filePath: tmpFile,
+        concurrency: 10,
+      });
+      expect(mockClient.post).toHaveBeenCalledTimes(2);
+      fs.unlinkSync(tmpFile);
+    });
+
+    it("returns inserted and failed counts in structuredContent", async () => {
+      const os = await import("os");
+      const fs = await import("fs");
+      const path = await import("path");
+      const tmpFile = path.join(os.tmpdir(), "test-import-counts.json");
+      fs.writeFileSync(tmpFile, JSON.stringify([{ name: "Alice" }]));
+      mockClient.post.mockResolvedValue({ _id: "inserted1" });
+      const result = (await handlers["import_bucket_data"]({
+        bucketId: "b1",
+        filePath: tmpFile,
+      })) as { structuredContent: { successCount: number; failureCount: number } };
+      expect(result.structuredContent.successCount).toBe(1);
+      expect(result.structuredContent.failureCount).toBe(0);
+      fs.unlinkSync(tmpFile);
+    });
+  });
 });

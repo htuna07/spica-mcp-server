@@ -180,4 +180,76 @@ describe("registerDevelopmentTools", () => {
       expect(mockClient.get).toHaveBeenCalledWith("/secret");
     });
   });
+
+  describe("update_secret", () => {
+    it("calls PUT /secret/{id} with updated key and value", async () => {
+      mockClient.put.mockResolvedValue({ _id: "s1", key: "DB_PASS", value: "newpass" });
+      await handlers["update_secret"]({ _id: "s1", key: "DB_PASS", value: "newpass" });
+      expect(mockClient.put).toHaveBeenCalledWith(
+        "/secret/s1",
+        expect.objectContaining({ key: "DB_PASS", value: "newpass" }),
+      );
+    });
+  });
+
+  describe("update_function", () => {
+    it("calls PUT /function/{id} with function body", async () => {
+      const fn = { _id: "fn1", name: "updated", env_vars: [], secrets: [] };
+      mockClient.put.mockResolvedValue(fn);
+      mockClient.get.mockResolvedValue(fn);
+      await handlers["update_function"]({
+        _id: "fn1",
+        name: "updated",
+        triggers: {},
+        timeout: 30,
+        language: "javascript",
+      });
+      expect(mockClient.put).toHaveBeenCalledWith(
+        "/function/fn1",
+        expect.objectContaining({ name: "updated", timeout: 30 }),
+      );
+    });
+
+    it("fetches the function after PUT", async () => {
+      const fn = { _id: "fn1", name: "updated", env_vars: [], secrets: [] };
+      mockClient.put.mockResolvedValue(fn);
+      mockClient.get.mockResolvedValue(fn);
+      await handlers["update_function"]({
+        _id: "fn1",
+        name: "updated",
+        triggers: {},
+        timeout: 30,
+        language: "javascript",
+      });
+      expect(mockClient.get).toHaveBeenCalledWith("/function/fn1");
+    });
+  });
+
+  describe("save_function_index", () => {
+    it("calls POST /function/{id}/index with the source code", async () => {
+      mockClient.post.mockResolvedValue(undefined);
+      await handlers["save_function_index"]({
+        functionId: "fn1",
+        index: "export default function() {}",
+      });
+      expect(mockClient.post).toHaveBeenCalledWith(
+        "/function/fn1/index",
+        expect.objectContaining({ index: "export default function() {}" }),
+      );
+    });
+  });
+
+  describe("save_function_dependencies", () => {
+    it("calls POST /function/{id}/dependencies with package name array", async () => {
+      mockClient.post.mockResolvedValue(undefined);
+      await handlers["save_function_dependencies"]({
+        functionId: "fn1",
+        packages: ["lodash", "axios@1.6.0"],
+      });
+      expect(mockClient.post).toHaveBeenCalledWith(
+        "/function/fn1/dependencies",
+        expect.objectContaining({ name: ["lodash", "axios@1.6.0"] }),
+      );
+    });
+  });
 });
