@@ -274,7 +274,7 @@ export const ActivityOutputSchema = {
   identifier: z.string().optional(),
   username: z.string().optional(),
   action: z.number().optional(),
-  resource: z.array(z.string()).optional(),
+  resource: z.array(z.any()).optional(),
   created_at: z.string().optional(),
 };
 

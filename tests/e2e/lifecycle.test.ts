@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { writeFileSync } from "fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -35,6 +36,8 @@ describe.skipIf(!shouldRun)("Spica E2E lifecycle (MCP tool calls)", () => {
   let envVarId: string;
   let secretId: string;
   let functionId: string;
+  let identityId: string;
+  let exportedFilePath: string;
 
   // Call a tool by name, parse JSON from content[0].text, throw on isError
   async function call(
@@ -161,6 +164,29 @@ describe.skipIf(!shouldRun)("Spica E2E lifecycle (MCP tool calls)", () => {
     expect(result.name).toBe("e2e-doc-updated");
   });
 
+  it("export_bucket_data writes a JSON file", async () => {
+    const result = (await call("export_bucket_data", {
+      bucketId,
+      format: "json",
+      directory: "/tmp",
+      fileName: "e2e-export-test",
+    })) as { filePath: string; totalDocuments: number };
+    expect(result.totalDocuments).toBeGreaterThanOrEqual(1);
+    expect(result.filePath).toMatch(/\.json$/);
+    exportedFilePath = result.filePath;
+  });
+
+  it("import_bucket_data inserts documents from a file", async () => {
+    const importFilePath = "/tmp/e2e-import-test.json";
+    writeFileSync(importFilePath, JSON.stringify([{ name: "e2e-imported", value: 77 }]));
+    const result = (await call("import_bucket_data", {
+      bucketId,
+      filePath: importFilePath,
+    })) as { totalProcessed: number; successCount: number };
+    expect(result.totalProcessed).toBe(1);
+    expect(result.successCount).toBe(1);
+  });
+
   // ── Storage ───────────────────────────────────────────────────────────
 
   it("list_storage_objects returns a result", async () => {
@@ -221,6 +247,22 @@ describe.skipIf(!shouldRun)("Spica E2E lifecycle (MCP tool calls)", () => {
     toDelete.push(`/passport/policy/${policyId}`);
   });
 
+  it("update_policy replaces the policy", async () => {
+    const result = (await call("update_policy", {
+      _id: policyId,
+      name: "e2e-policy",
+      description: "Updated by E2E",
+      statement: [
+        {
+          action: "bucket:index",
+          module: "bucket",
+          resource: { include: ["*"], exclude: [] },
+        },
+      ],
+    })) as { description: string };
+    expect(result.description).toBe("Updated by E2E");
+  });
+
   it("list_apikeys returns an array", async () => {
     const result = (await call("list_apikeys")) as unknown[];
     expect(Array.isArray(result)).toBe(true);
@@ -250,6 +292,24 @@ describe.skipIf(!shouldRun)("Spica E2E lifecycle (MCP tool calls)", () => {
   it("list_identities returns identities", async () => {
     const result = await call("list_identities");
     expect(result).toBeDefined();
+  });
+
+  it("insert_identity creates an identity", async () => {
+    const result = (await call("insert_identity", {
+      identifier: "e2e-tool-identity",
+      password: "E2eP@ssw0rd!",
+    })) as { _id: string };
+    expect(result._id).toBeDefined();
+    identityId = result._id;
+    toDelete.push(`/passport/identity/${identityId}`);
+  });
+
+  it("update_identity updates the identity", async () => {
+    const result = (await call("update_identity", {
+      _id: identityId,
+      identifier: "e2e-tool-identity",
+    })) as { _id: string };
+    expect(result._id).toBe(identityId);
   });
 
   it("list_users returns users", async () => {
@@ -356,6 +416,42 @@ describe.skipIf(!shouldRun)("Spica E2E lifecycle (MCP tool calls)", () => {
     expect(result).toBeDefined();
   });
 
+  it("update_function replaces the function", async () => {
+    const result = (await call("update_function", {
+      _id: functionId,
+      name: "e2e-tool-function",
+      description: "Updated by E2E",
+      language: "javascript",
+      timeout: 15,
+      triggers: {
+        default: {
+          type: "http",
+          active: true,
+          options: {
+            method: "Get",
+            path: "/e2e-tool-test",
+            preflight: true,
+            authenticate: [],
+            authorize: false,
+          },
+        },
+      },
+    })) as { timeout: number };
+    expect(result.timeout).toBe(15);
+  });
+
+  it("save_function_dependencies installs npm packages", async () => {
+    const result = await call("save_function_dependencies", {
+      functionId,
+      packages: ["ms"],
+    });
+    const msg =
+      typeof result === "string"
+        ? result
+        : (result as { message: string }).message;
+    expect(msg).toContain("ms");
+  }, 60_000);
+
   // ── Auditing ──────────────────────────────────────────────────────────
 
   it("list_activities returns activity log", async () => {
@@ -372,6 +468,14 @@ describe.skipIf(!shouldRun)("Spica E2E lifecycle (MCP tool calls)", () => {
 
   it("list_function_logs returns function logs", async () => {
     const result = await call("list_function_logs", { limit: 5 });
+    expect(result).toBeDefined();
+  });
+
+  it("list_bucket_data_profile returns profiled entries", async () => {
+    const result = await call("list_bucket_data_profile", {
+      bucketId,
+      limit: 5,
+    });
     expect(result).toBeDefined();
   });
 

@@ -540,10 +540,8 @@ export function registerAuthTools(
       const body: PolicyBase = { name, statement };
       if (description !== undefined) body.description = description;
 
-      const policy = (await client.put(
-        `/passport/policy/${_id}`,
-        body,
-      )) as PolicyBase;
+      await client.put(`/passport/policy/${_id}`, body);
+      const policy = (await client.get(`/passport/policy/${_id}`)) as PolicyBase;
 
       return {
         content: [
