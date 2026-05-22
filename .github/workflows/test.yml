@@ -44,9 +44,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     environment: spica-e2e
-    # Only run E2E when the secrets are available (e.g. not on forks)
-    if: ${{ secrets.SPICA_URL != '' && secrets.SPICA_APIKEY != '' }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
