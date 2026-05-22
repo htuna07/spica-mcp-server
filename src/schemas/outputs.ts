@@ -151,15 +151,22 @@ export const FunctionIndexOutputSchema = {
 };
 
 export const FunctionDependenciesOutputSchema = {
-  dependencies: z.record(z.string()).describe("Package name -> version map"),
+  dependencies: z.array(
+    z.object({
+      name: z.string(),
+      version: z.string(),
+    }),
+  ).describe("List of installed packages with their versions"),
 };
 
 export const FunctionLogOutputSchema = {
   _id: ObjectId,
   function: z.string(),
+  event_id: z.string().optional(),
   channel: z.string().optional(),
   content: z.string(),
   level: z.number().optional(),
+  created_at: z.string().optional(),
 };
 
 export const FunctionLogListOutputSchema = {
