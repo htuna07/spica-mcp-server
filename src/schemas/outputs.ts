@@ -120,7 +120,7 @@ export const FunctionOutputSchema = {
   _id: ObjectId,
   name: z.string(),
   description: z.string().optional(),
-  triggers: z.record(TriggerOutputSchema),
+  triggers: z.record(TriggerOutputSchema).optional(),
   timeout: z.number(),
   language: z.string(),
   env_vars: z

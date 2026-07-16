@@ -73,7 +73,7 @@ export interface SpicaFunction {
   _id: string;
   name: string;
   description?: string;
-  triggers: Record<string, Trigger>;
+  triggers?: Record<string, Trigger>;
   timeout: number;
   language: string;
   env_vars?: Array<string | { _id: string; key: string; value: string }>;

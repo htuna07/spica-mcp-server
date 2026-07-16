@@ -137,6 +137,19 @@ describe("registerDevelopmentTools", () => {
       });
       expect(mockClient.get).toHaveBeenCalledWith("/function/fn1");
     });
+
+    it("omits triggers from the body for a helper function", async () => {
+      const fn = { _id: "fn1", name: "helper" };
+      mockClient.post.mockResolvedValue(fn);
+      mockClient.get.mockResolvedValue(fn);
+      await handlers["insert_function"]({
+        name: "helper",
+        timeout: 30,
+        language: "javascript",
+      });
+      const body = mockClient.post.mock.calls[0][1];
+      expect(body).not.toHaveProperty("triggers");
+    });
   });
 
   describe("list_env_vars", () => {
