@@ -41,7 +41,7 @@ export const BucketOutputSchema = {
 };
 
 export const BucketListOutputSchema = {
-  buckets: z.array(z.object(BucketOutputSchema)),
+  buckets: z.array(z.object(BucketOutputSchema).passthrough()),
 };
 
 // ─── Bucket Documents ─────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ export const EnvVarOutputSchema = {
 };
 
 export const EnvVarListOutputSchema = {
-  env_vars: z.array(z.object(EnvVarOutputSchema)),
+  env_vars: z.array(z.object(EnvVarOutputSchema).passthrough()),
 };
 
 // ─── Secret ───────────────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ export const SecretOutputSchema = {
 };
 
 export const SecretListOutputSchema = {
-  secrets: z.array(z.object(SecretOutputSchema)),
+  secrets: z.array(z.object(SecretOutputSchema).passthrough()),
 };
 
 // ─── Function ─────────────────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ export const FunctionOutputSchema = {
 };
 
 export const FunctionListOutputSchema = {
-  functions: z.array(z.object(FunctionOutputSchema)),
+  functions: z.array(z.object(FunctionOutputSchema).passthrough()),
 };
 
 export const FunctionIndexOutputSchema = {
@@ -173,7 +173,7 @@ export const FunctionLogOutputSchema = {
 };
 
 export const FunctionLogListOutputSchema = {
-  logs: z.array(z.object(FunctionLogOutputSchema)),
+  logs: z.array(z.object(FunctionLogOutputSchema).passthrough()),
 };
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -198,7 +198,7 @@ export const PolicyOutputSchema = {
 };
 
 export const PolicyListOutputSchema = {
-  policies: z.array(z.object(PolicyOutputSchema)),
+  policies: z.array(z.object(PolicyOutputSchema).passthrough()),
 };
 
 export const ApiKeyOutputSchema = {
@@ -211,7 +211,7 @@ export const ApiKeyOutputSchema = {
 };
 
 export const ApiKeyListOutputSchema = {
-  apikeys: z.array(z.object(ApiKeyOutputSchema)),
+  apikeys: z.array(z.object(ApiKeyOutputSchema).passthrough()),
 };
 
 export const IdentityOutputSchema = {
@@ -233,7 +233,7 @@ export const IdentityOutputSchema = {
 };
 
 export const IdentityListOutputSchema = {
-  identities: z.array(z.object(IdentityOutputSchema)),
+  identities: z.array(z.object(IdentityOutputSchema).passthrough()),
 };
 
 export const UserOutputSchema = {
@@ -246,7 +246,7 @@ export const UserOutputSchema = {
 };
 
 export const UserListOutputSchema = {
-  users: z.array(z.object(UserOutputSchema)),
+  users: z.array(z.object(UserOutputSchema).passthrough()),
 };
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
@@ -266,7 +266,7 @@ export const StorageObjectOutputSchema = {
 };
 
 export const StorageObjectListOutputSchema = {
-  objects: z.array(z.object(StorageObjectOutputSchema)),
+  objects: z.array(z.object(StorageObjectOutputSchema).passthrough()),
 };
 
 // ─── Activity ─────────────────────────────────────────────────────────────────
@@ -281,7 +281,7 @@ export const ActivityOutputSchema = {
 };
 
 export const ActivityListOutputSchema = {
-  activities: z.array(z.object(ActivityOutputSchema)),
+  activities: z.array(z.object(ActivityOutputSchema).passthrough()),
 };
 
 // ─── Version Control ──────────────────────────────────────────────────────────
@@ -318,7 +318,7 @@ export const ProfileListOutputSchema = {
       appName: z.any().optional(),
       allUsers: z.any().optional(),
       user: z.any().optional(),
-    }),
+    }).passthrough(),
   ),
 };
 
