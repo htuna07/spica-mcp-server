@@ -40,7 +40,10 @@ export function registerDevelopmentTools(
     description: z.string().optional().describe("Description"),
     triggers: z
       .record(triggerInfo.schema as z.ZodType)
-      .describe("Triggers keyed by handler name in function index"),
+      .optional()
+      .describe(
+        "Triggers keyed by handler name in function index. Omit for helper functions that are only imported by other functions.",
+      ),
     timeout: z
       .number()
       .int()
@@ -303,11 +306,12 @@ export function registerDevelopmentTools(
       const fnBody: {
         _id?: string;
         name: string;
-        triggers: Record<string, Trigger>;
+        triggers?: Record<string, Trigger>;
         timeout: number;
         language: string;
         description?: string;
-      } = { name, triggers, timeout, language };
+      } = { name, timeout, language };
+      if (triggers !== undefined) fnBody.triggers = triggers;
       if (description !== undefined) fnBody.description = description;
       if (_id !== undefined) fnBody._id = _id;
 
@@ -357,11 +361,12 @@ export function registerDevelopmentTools(
     }) => {
       const fnBody: {
         name: string;
-        triggers: Record<string, Trigger>;
+        triggers?: Record<string, Trigger>;
         timeout: number;
         language: string;
         description?: string;
-      } = { name, triggers, timeout, language };
+      } = { name, timeout, language };
+      if (triggers !== undefined) fnBody.triggers = triggers;
       if (description !== undefined) fnBody.description = description;
 
       let fn = (await client.put(`/function/${_id}`, fnBody)) as SpicaFunction;
