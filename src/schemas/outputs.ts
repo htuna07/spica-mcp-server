@@ -91,6 +91,7 @@ export const EnvVarOutputSchema = {
   _id: ObjectId,
   key: z.string(),
   value: z.string(),
+  updated_at: z.string().optional(),
 };
 
 export const EnvVarListOutputSchema = {
@@ -102,6 +103,7 @@ export const EnvVarListOutputSchema = {
 export const SecretOutputSchema = {
   _id: ObjectId,
   key: z.string(),
+  updated_at: z.string().optional(),
 };
 
 export const SecretListOutputSchema = {
