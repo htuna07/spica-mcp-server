@@ -153,7 +153,7 @@ export function registerDevelopmentTools(
     {
       title: "Insert Environment Variable",
       description: "Creates a new environment variable.",
-      outputSchema: EnvVarOutputSchema,
+      outputSchema: z.object(EnvVarOutputSchema).passthrough(),
       inputSchema: z
         .object({
           _id: z
@@ -186,7 +186,7 @@ export function registerDevelopmentTools(
     {
       title: "Update Environment Variable",
       description: "Updates an existing environment variable. _id is required.",
-      outputSchema: EnvVarOutputSchema,
+      outputSchema: z.object(EnvVarOutputSchema).passthrough(),
       inputSchema: z
         .object({ _id: z.string().describe("Env var ID. Required.") })
         .merge(EnvVarInputBase),
@@ -231,7 +231,7 @@ export function registerDevelopmentTools(
     {
       title: "Insert Secret",
       description: "Creates a new secret.",
-      outputSchema: SecretOutputSchema,
+      outputSchema: z.object(SecretOutputSchema).passthrough(),
       inputSchema: z
         .object({
           _id: z
@@ -264,7 +264,7 @@ export function registerDevelopmentTools(
     {
       title: "Update Secret",
       description: "Updates an existing secret. _id is required.",
-      outputSchema: SecretOutputSchema,
+      outputSchema: z.object(SecretOutputSchema).passthrough(),
       inputSchema: z
         .object({ _id: z.string().describe("Secret ID. Required.") })
         .merge(SecretInputBase),
